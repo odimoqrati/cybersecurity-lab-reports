@@ -16,7 +16,7 @@ Welcome to my cybersecurity research and technical lab portfolio. This repositor
   *Remediation:* MS14-025 compliance, deployment of Windows LAPS, and gMSA accounts.
 
 * **[TryHackMe: Ra — AD & Protocol Exploitation](./ctfs/ra.md)**  
-  *Techniques:* Anonymous SMB share enumeration, XMPP client (Spark) analysis, NTLMv2 hash capture via Responder (HTML injection), Windows escalation auditing[cite: 9].
+  *Techniques:* Anonymous SMB share enumeration, XMPP client (Spark) analysis, NTLMv2 hash capture via Responder (HTML injection), Windows escalation auditing.
 
 ---
 
@@ -29,14 +29,14 @@ Welcome to my cybersecurity research and technical lab portfolio. This repositor
   *Techniques:* Web Authentication Bypass via SQLi, OS Command Injection (Ping utility), Interactive Python Bind Shell, local kernel exploit compilation (`9545.c`).
 
 * **[TryHackMe: Dogcat — LFI, Log Poisoning & Container Escape](./ctfs/dogcat.md)**  
-  *Techniques:* LFI filter bypass, Apache access log poisoning, `sudo env` abuse (GTFOBins), Docker container escape via shared volume mount (`backup.sh`)[cite: 7].
+  *Techniques:* LFI filter bypass, Apache access log poisoning, `sudo env` abuse (GTFOBins), Docker container escape via shared volume mount (`backup.sh`).
 
 * **[TryHackMe: Borderlands — Secret Leakage & Network Pivoting](./ctfs/borderlands.md)**  
-  *Techniques:* Exposed `.git` directory enumeration, secret extraction from commit history, OS shell via SQLMap, network pivoting (SOCKS proxy / Meterpreter) to internal vsFTPd service[cite: 8].
+  *Techniques:* Exposed `.git` directory enumeration, secret extraction from commit history, OS shell via SQLMap, network pivoting (SOCKS proxy / Meterpreter) to internal vsFTPd service.
 
 * **[Hack The Box: Layover — Multi-Stage Enterprise Attack Chain](./ctfs/layover.md)**  
-  *Techniques:* RDP jumpbox pivoting[cite: 10], open Wi-Fi HTTP credential capture[cite: 10], Craft CMS authenticated RCE[cite: 10], Yii2 application key decryption[cite: 10], CUPS local privilege escalation (CVE-2026-34990)[cite: 10].  
-  *Résultat:* Compromission complète multi-réseau de l'environnement jumpbox vers le serveur cible et élévation de privilèges root.
+  *Techniques:* RDP jumpbox pivoting, open Wi-Fi HTTP credential capture, Craft CMS authenticated RCE, Yii2 application key decryption, CUPS local privilege escalation (CVE-2026-34990).  
+  *Outcome:* Compromission complète multi-réseau de l'environnement jumpbox vers le serveur cible et élévation de privilèges root.
 
 ---
 
