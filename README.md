@@ -21,6 +21,13 @@ Welcome to my cybersecurity research and technical lab portfolio. This repositor
 ---
 
 ### 🌐 Web Exploitation, DevSecOps & Cloud/Container Security
+
+* **[Hack The Box: Enigma — Credential Chaining to Root via Dual RCEs](./ctfs/enigma.md)**  
+  *Techniques:* World-exported NFS share enumeration, credential leakage via onboarding document, webmail password reuse (horizontal credential chaining),
+  authenticated RCE in OpenSTAManager (CVE-2026-38751), database credential harvesting from app config, bcrypt hash cracking (Hashcat), hidden localhost-only
+  service discovery, OliveTin RCE (CVE-2026-27626).  
+  *Outcome:* Full compromise from an anonymous NFS mount to a root shell via two chained CVEs.
+  
 * **[Web RCE via Drupalgeddon2 (CVE-2018-7600) to SUID Root Escalation](./web-exploitation/drupalgeddon2-rce.md)**  
   *Techniques:* Form API payload injection (CVE-2018-7600), Python/Metasploit PoCs, privilege escalation via `/usr/bin/find` SUID binary (GTFOBins).  
   *Outcome:* Escalation from a `www-data` web shell to an interactive **Root** shell.
